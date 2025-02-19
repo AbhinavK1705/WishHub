@@ -1,70 +1,107 @@
-(() => {
-  function getProductImage() {
-    // Try selecting the main product image using common selectors
-    let imgElement = document.querySelector(
-      "img[src*='product'], img[src*='image'], img[src*='media'], img[src*='pdp'], img[src*='flipkart'], img[src*='myntra'], img[src*='amazon']"
-    );
+const siteConfigs = {
+  'flipkart.com': {
+    imageSelector: '._53J4C-.utBuJY',
+    titleSelector: '.VU-ZEz',
+    priceSelector: '.Nx9bqj.CxhGGd',
+    originalPriceSelector: '.yRaY8j',
+    currency: 'INR',
+    site: 'Flipkart',
+  },
+  'myntra.com': {
+    imageSelector: '.image-grid-image',
+    titleSelector: '.pdp-name',
+    priceSelector: '.pdp-price strong',
+    originalPriceSelector: '.pdp-mrp s', // Strikethrough price
+    currency: 'INR',
+    site: 'Myntra',
+  },
+  'amazon.': {
+    // Matches any Amazon domain (.in, .com, etc.)
+    imageSelector: '.a-dynamic-image',
+    titleSelector: '#productTitle',
+    priceSelector: '.a-price-whole',
+    originalPriceSelector: '.a-text-price.a-offscreen',
+    currency: 'INR',
+    site: 'Amazon',
+  },
+  'bewakoof.com': {
+    imageSelector: '.sc-1nbuep6-2',
+    titleSelector: 'h1',
+    priceSelector: '.price',
+    originalPriceSelector: '.mr-2.line-through', // Strikethrough price
+    currency: 'INR',
+    site: 'Bewakoof',
+  },
+};
 
-    // Fallback: If no image is found, select the first large image that is not a logo
-    if (!imgElement) {
-      let images = document.querySelectorAll('img');
-      images.forEach(img => {
-        let width = img.naturalWidth || img.width;
-        let height = img.naturalHeight || img.height;
+// Function to extract product details
+function getProductData() {
+  let site = Object.keys(siteConfigs).find(key =>
+    window.location.href.includes(key)
+  );
+  if (!site) return null; // If site is not listed, return null
 
-        // Ignore small images (like logos)
-        if (width > 100 && height > 100) {
-          imgElement = img;
-        }
-      });
+  let config = siteConfigs[site];
+
+  // Extract Image
+  let imageElement = document.querySelector(config.imageSelector);
+  let imageUrl = imageElement
+    ? imageElement.tagName === 'META'
+      ? imageElement.content
+      : imageElement.src
+    : 'Image Not Found';
+
+  // Extract Title
+  let titleElement = document.querySelector(config.titleSelector);
+  let title = titleElement
+    ? titleElement.textContent.trim()
+    : 'Unknown Product';
+
+  // Extract Price
+  let priceElement = document.querySelector(config.priceSelector);
+  let price = priceElement
+    ? parseInt(priceElement.textContent.replace(/[^\d]/g, ''))
+    : null;
+
+  // Extract Original Price
+  let originalPriceElement = document.querySelector(
+    config.originalPriceSelector
+  );
+  let originalPrice = originalPriceElement
+    ? parseInt(originalPriceElement.textContent.replace(/[^\d]/g, ''))
+    : null;
+  console.log(originalPriceElement, 'dsf');
+  if (!originalPrice) {
+    let priceText =
+      originalPriceElement.innerText || originalPriceElement.textContent;
+    let priceMatch = priceText.match(/\d+/g); // Extract all numeric values
+
+    if (priceMatch && priceMatch.length > 0) {
+      originalPrice = parseInt(priceMatch.join('')); // Join and convert to integer
     }
-
-    return imgElement ? imgElement.src : 'No image found';
   }
 
-  console.log(getProductImage());
+  // Calculate Discount Percentage
+  let discountPercentage =
+    originalPrice && price
+      ? Math.round(((originalPrice - price) / originalPrice) * 100)
+      : 0;
 
-  function getProductDetails() {
-    let title =
-      document.querySelector('h1, .product-title, .product-name')?.innerText ||
-      'Unknown Product';
-    let url = window.location.href;
-    let image = getProductImage();
+  return {
+    image: imageUrl,
+    title: title,
+    price: price,
+    currency: config.currency,
+    original_price: originalPrice,
+    discount_percentage: discountPercentage,
+    url: window.location.href,
+    site: config.site,
+  };
+}
 
-    // Extract price from Myntra, Flipkart, and Amazon
-    let price =
-      document.querySelector('.pdp-price strong')?.innerText || // Myntra
-      document.querySelector('.Nx9bqj.CxhGGd')?.innerText || // Flipkart
-      document.querySelector('._30jeq3')?.innerText || // Another Flipkart price class
-      document.querySelector('.a-price-whole')?.innerText || //Amazon
-      document.querySelector('.prod-sp')?.innerText || //Ajio
-      document.querySelector('.mr-1')?.innerText || //Bewakoof
-      document.querySelector('.price, .product-price')?.innerText || // Generic price selectors
-      'Price Not Found';
-
-    console.log('Extracted Product Details:', { title, price, image, url }); // Debugging
-
-    if (!title || !price) {
-      // Try extracting from an iframe
-      document.querySelectorAll('iframe').forEach(iframe => {
-        try {
-          let doc = iframe.contentDocument || iframe.contentWindow.document;
-          title =
-            doc.querySelector('#productTitle')?.innerText?.trim() || title;
-          price =
-            doc.querySelector('.a-price-whole')?.innerText?.trim() || price;
-        } catch (e) {
-          console.warn('Blocked from accessing iframe:', e);
-        }
-      });
-    }
-
-    return { title, price, image, url };
+// Listen for messages from popup.js
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'getProduct') {
+    sendResponse(getProductData());
   }
-
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === 'getProduct') {
-      sendResponse(getProductDetails());
-    }
-  });
-})();
+});

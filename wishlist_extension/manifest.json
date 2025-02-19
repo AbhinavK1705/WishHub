@@ -21,5 +21,11 @@
       "matches": ["*://*/*"],
       "js": ["content.js"]
     }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["siteConfig.js"],
+      "matches": ["<all_urls>"]
+    }
   ]
 }
