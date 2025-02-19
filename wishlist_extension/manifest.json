@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "WishHub",
+  "version": "1.0",
+  "description": "Save wishlisted products from any shopping site.",
+  "permissions": ["storage", "activeTab", "scripting", "tabs"],
+  "host_permissions": [
+    "https://www.amazon.com/*",
+    "https://www.flipkart.com/*",
+    "*://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*/*"],
+      "js": ["content.js"]
+    }
+  ]
+}
